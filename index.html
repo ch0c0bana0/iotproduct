@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>IoT Test Server</title>
+	<style type='text/css'>
+		ul { list-style: none; }
+		#recordingslist audio { display: block; margin-bottom: 10px; }
+	</style>
+</head>
+<!-- <body onload="vr_function();"> -->
+<body>
+	<h2>Web Audio API TEST SERVER</h2>
+	
+	<!-- <button id="start" onclick="startRecording(this);">start</button> -->
+	<!-- <button id="stop" onclick="stopRecording(this);" disabled>stop</button> -->
+	<button id="start" onclick="vr_function();">start</button>
+	<button id="stop" onclick="stopRecording(this);" disabled>stop</button>
+	
+	<ul id="recordingslist"></ul>
+	
+	<h3>Status</h3>
+	<h4>
+        <textarea id="result_text" cols="100" rows="10">
+        </textarea>
+        <br>
+        <textarea id="status" cols="100" rows="1">
+        </textarea>
+        <br>
+        <textarea id="count" cols="10" rows="1">
+        </textarea>
+        <br> 
+        </h4>
+	<pre id="log"></pre>
+
+	<script>
+
+        var flag_speech = 0;
+        var counter = 60;
+
+        function loopSleep(_loopLimit,_interval, _mainFunc){
+            var loopLimit = _loopLimit;
+            var interval = _interval;
+            var mainFunc = _mainFunc;
+            var i = 0;
+            var loopFunc = function () {
+                var result = mainFunc(i);
+                if (result === false) {
+                    // break機能
+                    return;
+                }
+                i = i + 1;
+                if (i < loopLimit) {
+                    setTimeout(loopFunc, interval);
+                }
+            }
+            loopFunc();
+        } 
+
+        loopSleep(Infinity, 1000, function(i){
+            if(counter != 0) {
+                counter = counter - 1;
+                document.getElementById('count').innerHTML = counter;
+            }
+        });
+
+        function vr_function() {
+            window.SpeechRecognition = window.SpeechRecognition || webkitSpeechRecognition;
+            var recognition = new webkitSpeechRecognition();
+            var reco_flg = false;
+            recognition.lang = 'ja';
+            recognition.interimResults = true;
+            recognition.continuous = true;
+ 
+            recognition.onsoundstart = function() {
+                if(reco_flg == false) {
+                    document.getElementById('status').innerHTML = "認識中";
+                    reco_flg = true;
+                    counter = 60;
+                    startRecording(document.getElementById('start'));
+                } else {
+                    //延長処理
+                    counter = 60;
+                }
+            };
+            recognition.onnomatch = function() {
+                document.getElementById('status').innerHTML = "もう一度試してください";
+            };
+            recognition.onerror = function() {
+                document.getElementById('status').innerHTML = "エラー";
+                if(flag_speech == 0)
+                  vr_function();
+            };
+            recognition.onsoundend = function() {
+                if(reco_flg = true && counter == 0) {
+                    document.getElementById('status').innerHTML = "停止中";
+                    stopRecording(document.getElementById('stop'));
+                    reco_flg = false;
+                    vr_function();
+                } else {
+                    //初期化処理
+                    vr_function();
+                }
+            };
+ 
+            recognition.onresult = function(event) {
+                var results = event.results;
+                for (var i = event.resultIndex; i < results.length; i++) {
+                    if (results[i].isFinal)
+                    {
+                        document.getElementById('result_text').innerHTML = results[i][0].transcript;
+                        vr_function();
+                    }
+                    else
+                    {
+                        document.getElementById('result_text').innerHTML = "[途中経過] " + results[i][0].transcript;
+                        flag_speech = 1;
+                    }
+                }
+            }
+            flag_speech = 0;
+            document.getElementById('status').innerHTML = "start";
+            recognition.start();
+        }
+
+	function __log(e, data) {
+		log.innerHTML += e + " " + (data || '') + '\n';
+	}
+
+	var audio_context;
+	var recorder;
+
+	function startUserMedia(stream)
+	{
+		var input = audio_context.createMediaStreamSource(stream);
+		__log('Media stream created.');
+		
+		recorder = new Recorder(input);
+		__log('Recorder initialised.');
+	}
+
+	function startRecording(button)
+	{
+		recorder && recorder.record();
+		button.disabled = true;
+		button.nextElementSibling.disabled = false;
+		__log('Recording...');
+	}
+
+	function stopRecording(button)
+	{
+		recorder && recorder.stop();
+		button.disabled = true;
+		button.previousElementSibling.disabled = false;
+		__log('Stopped recording.');
+		
+		createDownloadLink();
+		recorder.clear();
+	}
+
+	function createDownloadLink()
+	{
+		recorder && recorder.exportWAV(function(blob) {
+			var url = URL.createObjectURL(blob);
+			var li = document.createElement('li');
+			var au = document.createElement('audio');
+			var hf = document.createElement('a');
+			
+			au.controls = true;
+			au.src = url;
+			hf.href = url;
+			hf.download = new Date().toISOString() + '.wav';
+			hf.innerHTML = hf.download;
+			li.appendChild(au);
+			li.appendChild(hf);
+			recordingslist.appendChild(li);
+                        hf.click();
+		});
+	}
+
+	window.onload = function init()
+	{
+		try
+		{
+			window.AudioContext = window.AudioContext || window.webkitAudioContext;
+			navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia;
+			window.URL = window.URL || window.webkitURL;
+			
+			audio_context = new AudioContext;
+			__log('Audio context set up.');
+			__log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+		}
+		catch (e)
+		{
+			alert('No web audio support in this browser!');
+		}
+		
+		navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
+			__log('No live audio input: ' + e);
+		});
+	};
+	</script>
+
+	<script src="./recorder.js"></script>
+</body>
+</html>

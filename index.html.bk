@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+ 
+<head>
+    <meta charset="UTF-8">
+    <title>Web Speech API</title>
+    <script>
+        var flag_speech = 0;
+        //var audioContext = new AudioContext();
+        //var recorder = new Recorder(audioContext);
+        //var recorder = new window.MediaRecorder(stream);
+ 
+        function vr_function() {
+            window.SpeechRecognition = window.SpeechRecognition || webkitSpeechRecognition;
+            var recognition = new webkitSpeechRecognition();
+            recognition.lang = 'ja';
+            recognition.interimResults = true;
+            recognition.continuous = true;
+ 
+            recognition.onsoundstart = function() {
+                document.getElementById('status').innerHTML = "認識中";
+            };
+            recognition.onnomatch = function() {
+                document.getElementById('status').innerHTML = "もう一度試してください";
+            };
+            recognition.onerror = function() {
+                document.getElementById('status').innerHTML = "エラー";
+                if(flag_speech == 0)
+                  vr_function();
+            };
+            recognition.onsoundend = function() {
+                document.getElementById('status').innerHTML = "停止中";
+                  vr_function();
+            };
+ 
+            recognition.onresult = function(event) {
+                var results = event.results;
+                recorder.recStart();
+                for (var i = event.resultIndex; i < results.length; i++) {
+                    if (results[i].isFinal)
+                    {
+                        document.getElementById('result_text').innerHTML = results[i][0].transcript;
+                        vr_function();
+                        ecorder.recStop();
+                        var blob = exportWAV(recorder.getAudioBufferArray(), audioContext.sampleRate)
+                        var url = URL.createObjectURL(blob);
+                    }
+                    else
+                    {
+                        document.getElementById('result_text').innerHTML = "[途中経過] " + results[i][0].transcript;
+                        flag_speech = 1;
+                    }
+                }
+            }
+            flag_speech = 0;
+            document.getElementById('status').innerHTML = "start";
+            recognition.start();
+        }
+
+ var localMediaStream = null;
+        var localScriptProcessor = null;
+        audioData = []; // 録音データ
+
+        var onAudioProcess = function(e) {
+          var input = e.inputBuffer.getChannelData(0);
+          var bufferData = new Float32Array(bufferSize);
+          for (var i = 0; i < bufferSize; i++) {
+            bufferData[i] = input[i];
+          }
+
+          audioData.push(bufferData);
+        };
+        var startRecording = function() {
+          navigator.getUserMedia(
+            { audio: true },
+            function(stream) {
+              localMediaStream = stream;
+              var scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+              localScriptProcessor = scriptProcessor;
+              var mediastreamsource = audioContext.createMediaStreamSource(stream);
+              mediastreamsource.connect(scriptProcessor);
+              scriptProcessor.onaudioprocess = onAudioProcess;
+              scriptProcessor.connect(audioContext.destination);
+            },
+            function(e) {
+              console.log(e);
+            }
+          );
+        };
+
+var exportWAV = function(audioData) {
+
+          var encodeWAV = function(samples, sampleRate) {
+            var buffer = new ArrayBuffer(44 + samples.length * 2);
+            var view = new DataView(buffer);
+
+            var writeString = function(view, offset, string) {
+              for (var i = 0; i < string.length; i++){
+                view.setUint8(offset + i, string.charCodeAt(i));
+              }
+            };
+
+            var floatTo16BitPCM = function(output, offset, input) {
+              for (var i = 0; i < input.length; i++, offset += 2){
+                var s = Math.max(-1, Math.min(1, input[i]));
+                output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+              }
+            };
+
+            writeString(view, 0, 'RIFF');  // RIFFヘッダ
+            view.setUint32(4, 32 + samples.length * 2, true); // これ以降のファイルサイズ
+            writeString(view, 8, 'WAVE'); // WAVEヘッダ
+            writeString(view, 12, 'fmt '); // fmtチャンク
+            view.setUint32(16, 16, true); // fmtチャンクのバイト数
+            view.setUint16(20, 1, true); // フォーマットID
+            view.setUint16(22, 1, true); // チャンネル数
+            view.setUint32(24, sampleRate, true); // サンプリングレート
+            view.setUint32(28, sampleRate * 2, true); // データ速度
+            view.setUint16(32, 2, true); // ブロックサイズ
+            view.setUint16(34, 16, true); // サンプルあたりのビット数
+            writeString(view, 36, 'data'); // dataチャンク
+            view.setUint32(40, samples.length * 2, true); // 波形データのバイト数
+            floatTo16BitPCM(view, 44, samples); // 波形データ
+
+            return view;
+          };
+
+          var mergeBuffers = function(audioData) {
+            var sampleLength = 0;
+            for (var i = 0; i < audioData.length; i++) {
+              sampleLength += audioData[i].length;
+            }
+            var samples = new Float32Array(sampleLength);
+            var sampleIdx = 0;
+            for (var i = 0; i < audioData.length; i++) {
+              for (var j = 0; j < audioData[i].length; j++) {
+                samples[sampleIdx] = audioData[i][j];
+                sampleIdx++;
+              }
+            }
+            return samples;
+          };
+
+          var dataview = encodeWAV(mergeBuffers(audioData), audioContext.sampleRate);
+          var audioBlob = new Blob([dataview], { type: 'audio/wav' });
+
+          var myURL = window.URL || window.webkitURL;
+          var url = myURL.createObjectURL(audioBlob);
+          return url;
+        };
+
+/*
+    window.Recorder = function(audioContext, bufferSize){
+        var o = this;
+        o.audioContext = audioContext;
+        o.bufferSize = bufferSize || 4096;
+    }
+    Recorder.prototype = {
+        audioContext : '',
+        bufferSize : '',
+        audioBufferArray : [],
+        stream : '',
+        recording : function(stream){
+            var o = this;
+            o.stream = stream;
+            var mediaStreamSource =
+                o.audioContext.createMediaStreamSource(stream);
+            var scriptProcessor =
+                o.audioContext.createScriptProcessor(o.bufferSize, 1, 1);
+            mediaStreamSource.connect(scriptProcessor);
+            o.audioBufferArray = [];
+            scriptProcessor.onaudioprocess = function(event){
+                var channel = event.inputBuffer.getChannelData(0);
+                var buffer = new Float32Array(o.bufferSize);
+                for (var i = 0; i < o.bufferSize; i++) {
+                    buffer[i] = channel[i];
+                }
+                o.audioBufferArray.push(buffer);
+            }
+            //この接続でonaudioprocessが起動
+            scriptProcessor.connect(o.audioContext.destination);
+            o.scriptProcessor = scriptProcessor;
+        },
+        recStart : function(){
+            var o = this;
+            if(o.stream){
+                o.recording(o.stream);
+            }
+            else{
+                navigator.getUserMedia(
+                    {video: false, audio: true},
+                    function(stream){o.recording(stream)},
+                    function(err){
+                        console.log(err.name ? err.name : err);
+                    }
+                );
+            }
+        },
+        recStop : function(){
+            var o = this;
+            o.scriptProcessor.disconnect();
+            if(o.stream){
+                o.stream.stop();
+                o.stream = null;
+            }
+        },
+        getAudioBufferArray : function(){
+            var o = this;
+            return o.audioBufferArray
+        },
+        getAudioBuffer : function(){
+            var o = this;
+            var buffer = o.audioContext.createBuffer(
+                1,
+                o.audioBufferArray.length * o.bufferSize,
+                o.audioContext.sampleRate
+            );
+            var channel = buffer.getChannelData(0);
+            for (var i = 0; i < o.audioBufferArray.length; i++) {
+                for (var j = 0; j < o.bufferSize; j++) {
+                    channel[i * o.bufferSize + j] = o.audioBufferArray[i][j];
+                }
+            }
+            return buffer;
+        }
+    }
+
+    window.exportWAV = function(audioData, sampleRate) {
+        var encodeWAV = function(samples, sampleRate) {
+            var buffer = new ArrayBuffer(44 + samples.length * 2);
+            var view = new DataView(buffer);
+            var writeString = function(view, offset, string) {
+                for (var i = 0; i < string.length; i++){
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            var floatTo16BitPCM = function(output, offset, input) {
+                for (var i = 0; i < input.length; i++, offset += 2){
+                    var s = Math.max(-1, Math.min(1, input[i]));
+                    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                }
+            };
+            writeString(view, 0, 'RIFF');  // RIFFヘッダ
+            view.setUint32(4, 32 + samples.length * 2, true); // これ以降のファイルサイズ
+            writeString(view, 8, 'WAVE'); // WAVEヘッダ
+            writeString(view, 12, 'fmt '); // fmtチャンク
+            view.setUint32(16, 16, true); // fmtチャンクのバイト数
+            view.setUint16(20, 1, true); // フォーマットID
+            view.setUint16(22, 1, true); // チャンネル数
+            view.setUint32(24, sampleRate, true); // サンプリングレート
+            view.setUint32(28, sampleRate * 2, true); // データ速度
+            view.setUint16(32, 2, true); // ブロックサイズ
+            view.setUint16(34, 16, true); // サンプルあたりのビット数
+            writeString(view, 36, 'data'); // dataチャンク
+            view.setUint32(40, samples.length * 2, true); // 波形データのバイト数
+            floatTo16BitPCM(view, 44, samples); // 波形データ
+            return view;
+        };
+        var mergeBuffers = function(audioData) {
+            var sampleLength = 0;
+            for (var i = 0; i < audioData.length; i++) {
+              sampleLength += audioData[i].length;
+            }
+            var samples = new Float32Array(sampleLength);
+            var sampleIdx = 0;
+            for (var i = 0; i < audioData.length; i++) {
+              for (var j = 0; j < audioData[i].length; j++) {
+                samples[sampleIdx] = audioData[i][j];
+                sampleIdx++;
+              }
+            }
+            return samples;
+        };
+        var dataview = encodeWAV(mergeBuffers(audioData), sampleRate);
+        var audioBlob = new Blob([dataview], { type: 'audio/wav' });
+        return audioBlob;
+    };
+*/
+    </script> 
+</head>
+ 
+<body>
+    <textarea id="result_text" cols="100" rows="10">
+    </textarea>
+    <br>
+    <textarea id="status" cols="100" rows="1">
+    </textarea>
+    <br>
+    <input type="button" onClick="vr_function();" value="音認開始">
+</body>
+ 
+</html>
