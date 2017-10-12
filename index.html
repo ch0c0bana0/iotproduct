@@ -38,6 +38,7 @@
 
         var flag_speech = 0;
         var counter = 60;
+        var count_flg = false;
 
         function loopSleep(_loopLimit,_interval, _mainFunc){
             var loopLimit = _loopLimit;
@@ -53,17 +54,22 @@
                 i = i + 1;
                 if (i < loopLimit) {
                     setTimeout(loopFunc, interval);
+                    if(count_flg == false) {
+                        loopLimit = 0;
+                    }
                 }
             }
             loopFunc();
         } 
 
+/*
         loopSleep(Infinity, 1000, function(i){
             if(counter != 0) {
                 counter = counter - 1;
                 document.getElementById('count').innerHTML = counter;
             }
         });
+*/
 
         function vr_function() {
             window.SpeechRecognition = window.SpeechRecognition || webkitSpeechRecognition;
@@ -93,6 +99,24 @@
                   vr_function();
             };
             recognition.onsoundend = function() {
+                reco_flg = false;
+                document.getElementById('status').innerHTML = "停止中";
+                if(count_flg == false){
+                    count_flg = true;
+                    loopSleep(Infinity, 1000, function(i){
+                        if(counter != 0) {
+                            counter = counter - 1;
+                            document.getElementById('count').innerHTML = counter;
+                            if(reco_flg = true && counter == 0) {
+                                stopRecording(document.getElementById('stop'));
+                                count_flg = false;
+                                vr_function();
+                            }
+                        }
+                    });
+                }
+                vr_function();
+/*
                 if(reco_flg = true && counter == 0) {
                     document.getElementById('status').innerHTML = "停止中";
                     stopRecording(document.getElementById('stop'));
@@ -102,6 +126,7 @@
                     //初期化処理
                     vr_function();
                 }
+*/
             };
  
             recognition.onresult = function(event) {
