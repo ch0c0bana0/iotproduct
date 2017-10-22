@@ -11,7 +11,6 @@
 </head>
 <!-- <body onload="vr_function();"> -->
 <body>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
 	<h2>Web Audio API TEST SERVER</h2>
 	
 	<!-- <button id="start" onclick="startRecording(this);">start</button> -->
@@ -34,11 +33,6 @@
         <br> 
         </h4>
 	<pre id="log"></pre>
-
-        <form id="myForm" name="myForm" method="post" action="">
-          <!-- <input type="file" name="file" id="formFile"/> --><br>
-          <button type="button" onclick="button_file_upload()">アップロード</button>
-        </form>
 
 	<script>
 
@@ -187,8 +181,6 @@
 		__log('Stopped recording.');
 		
 		createDownloadLink();
-                sendSoundData();
-                file_upload();
 		recorder.clear();
 	}
 
@@ -211,85 +203,6 @@
                         hf.click();
 		});
 	}
- 
-        function sendSoundData()
-        {
-                recorder && recorder.exportWAV(function(blob) {
-                        var fd = new FormData();
-                        fd.append('fname', new Date().toISOString() + '.wav');
-                        fd.append('data', blob);
-                        $.ajax({
-                                type: 'POST',
-                                url: 'https://192.168.10.109/index.php',
-                                data: fd,
-                                processData: false,
-                                contentType: false
-                        }).done(function(data) {
-                                console.log(data);
-                        });
-                });
-        }
-
-       function file_upload()
-       {
-            recorder && recorder.exportWAV(function(blob) {
-                // フォームデータを取得
-                var input = document.createElement('input');
-                var submitForm = document.getElementById('myForm');
-                input.id = "formFile";
-                //input.type = "file";
-                input.name = "file";
-                
-                submitForm.appendChild(input);
-                
-                //document.getElementById('formFile').value='C:\\Users\\quand\\Downloads\\2017-10-22T02-37-37.060Z.wav';
-                document.getElementById('formFile').value=blob;
-                var formdata = new FormData($('#myForm').get(0));
-                //var fd = new FormData();
-                //fd.append('name', new Date().toISOString() + '.wav');
-                //fd.append('data', blob);
-
-                // POSTでアップロード
-                $.ajax({
-                    url  : 'https://192.168.10.109/button_upload.php',
-                    type : "POST",
-                    data : formdata,
-                    cache       : false,
-                    contentType : false,
-                    processData : false,
-                    dataType    : "text"
-                })
-                .done(function(data, textStatus, jqXHR){
-                    alert(data);
-                })
-                .fail(function(jqXHR, textStatus, errorThrown){
-                    alert("fail");
-                });
-            });
-        }
-
-        function button_file_upload()
-        {
-            // フォームデータを取得
-            var formdata = new FormData($('#myForm').get(0));
-
-            // POSTでアップロード
-            $.ajax({
-                url  : 'https://192.168.10.109/button_upload.php',
-                type : "POST",
-                data : formdata,
-                cache       : false,
-                contentType : false,
-                processData : false,
-                dataType    : "text"
-            })
-            .done(function(data, textStatus, jqXHR){
-                alert(data);
-            })
-            .fail(function(jqXHR, textStatus, errorThrown){
-                alert("fail");
-            });
-        }
 
 	window.onload = function init()
 	{
