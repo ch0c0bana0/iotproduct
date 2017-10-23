@@ -36,7 +36,7 @@
 	<pre id="log"></pre>
 
         <form id="myForm" name="myForm" method="post" action="">
-          <!-- <input type="file" name="file" id="formFile"/> --><br>
+          <input type="file" name="file" id="formFile"/><br>
           <button type="button" onclick="button_file_upload()">アップロード</button>
         </form>
 
@@ -233,31 +233,54 @@
        function file_upload()
        {
             recorder && recorder.exportWAV(function(blob) {
-                // フォームデータを取得
-                var input = document.createElement('input');
-                var submitForm = document.getElementById('myForm');
-                input.id = "formFile";
-                //input.type = "file";
-                input.name = "file";
-                
-                submitForm.appendChild(input);
-                
-                //document.getElementById('formFile').value='C:\\Users\\quand\\Downloads\\2017-10-22T02-37-37.060Z.wav';
-                document.getElementById('formFile').value=blob;
-                var formdata = new FormData($('#myForm').get(0));
                 //var fd = new FormData();
                 //fd.append('name', new Date().toISOString() + '.wav');
-                //fd.append('data', blob);
+                //fd.append('soundData', blob);
+                //fd.append('testText', 'test');
+
+
+                var file = URL.createObjectURL(blob);
+                var oReq = new XMLHttpRequest();
+                oReq.open('GET', file, true);
+                oReq.responseType = 'blob';
+
+                oReq.onload = function() {
+                var formData = new FormData();
+                formData.append('name', new Date().toISOString() + '.wav');
+                formData.append('soundData', this.response);
+                alert(this.response);
+
+                $.ajax({
+                    type: 'POST',
+                    url  : 'https://192.168.10.109/upload.php',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(data) {
+                        console.log(data);
+                    },
+                        error: function(response) {
+                            console.log(response);
+                        }
+                    });
+                };
+ 
+                oReq.send();
+                //var reader=new FileReader();
+                //reader.onload = function(e){
+                //    console.log("読み込みが終わりました");
+                //};
 
                 // POSTでアップロード
+                /*
                 $.ajax({
-                    url  : 'https://192.168.10.109/button_upload.php',
+                    url  : 'https://192.168.10.109/upload.php',
                     type : "POST",
-                    data : formdata,
+                    data : fd,
                     cache       : false,
                     contentType : false,
                     processData : false,
-                    dataType    : "text"
+                    //dataType    : "text"
                 })
                 .done(function(data, textStatus, jqXHR){
                     alert(data);
@@ -265,6 +288,7 @@
                 .fail(function(jqXHR, textStatus, errorThrown){
                     alert("fail");
                 });
+                */
             });
         }
 
